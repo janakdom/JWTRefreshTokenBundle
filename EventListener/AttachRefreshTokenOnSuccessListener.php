@@ -11,6 +11,8 @@
 
 namespace Gesdinet\JWTRefreshTokenBundle\EventListener;
 
+use Gesdinet\JWTRefreshTokenBundle\Event\RefreshTokenCreatedEvent;
+use Gesdinet\JWTRefreshTokenBundle\Events;
 use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenInterface;
 use Gesdinet\JWTRefreshTokenBundle\Model\RefreshTokenManagerInterface;
 use Gesdinet\JWTRefreshTokenBundle\Request\RequestRefreshToken;
@@ -19,6 +21,8 @@ use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\PropertyAccess\PropertyAccessor;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
+use Symfony\Contracts\EventDispatcher\EventDispatcherInterface as ContractsEventDispatcherInterface;
 
 class AttachRefreshTokenOnSuccessListener
 {
@@ -68,17 +72,19 @@ class AttachRefreshTokenOnSuccessListener
     protected $singleUse;
 
     /**
+     * @var EventDispatcherInterface
+     */
+    protected $eventDispatcher;
+
+    /**
      * AttachRefreshTokenOnSuccessListener constructor.
      *
-     * @param RefreshTokenManagerInterface $refreshTokenManager
-     * @param int                          $ttl
-     * @param ValidatorInterface           $validator
-     * @param RequestStack                 $requestStack
-     * @param string                       $userIdentityField
-     * @param string                       $tokenParameterName
-     * @param string                       $tokenExpirationParameterName
-     * @param bool                         $returnExpiration
-     * @param bool                         $singleUse
+     * @param int    $ttl
+     * @param string $userIdentityField
+     * @param string $tokenParameterName
+     * @param string $tokenExpirationParameterName
+     * @param bool   $returnExpiration
+     * @param bool   $singleUse
      */
     public function __construct(
         RefreshTokenManagerInterface $refreshTokenManager,
@@ -89,7 +95,8 @@ class AttachRefreshTokenOnSuccessListener
         $tokenParameterName,
         $tokenExpirationParameterName,
         $returnExpiration,
-        $singleUse
+        $singleUse,
+        EventDispatcherInterface $eventDispatcher
     ) {
         $this->refreshTokenManager = $refreshTokenManager;
         $this->ttl = $ttl;
@@ -100,6 +107,7 @@ class AttachRefreshTokenOnSuccessListener
         $this->tokenExpirationParameterName = $tokenExpirationParameterName;
         $this->returnExpiration = $returnExpiration;
         $this->singleUse = $singleUse;
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     public function attachRefreshToken(AuthenticationSuccessEvent $event)
@@ -159,11 +167,17 @@ class AttachRefreshTokenOnSuccessListener
                 }
             }
 
-            $this->refreshTokenManager->save($refreshToken);
+            $refreshTokenEvent = new RefreshTokenCreatedEvent($refreshToken);
+            if ($this->eventDispatcher instanceof ContractsEventDispatcherInterface) {
+                $this->eventDispatcher->dispatch($refreshTokenEvent, Events::ON_REFRESH_TOKEN_CREATED);
+            } else {
+                $this->eventDispatcher->dispatch(Events::ON_REFRESH_TOKEN_CREATED, $refreshTokenEvent);
+            }
+            $this->refreshTokenManager->save($refreshTokenEvent->getRefreshToken());
 
-            $data[$this->tokenParameterName] = $refreshToken->getRefreshToken();
+            $data[$this->tokenParameterName] = $refreshTokenEvent->getRefreshToken()->getRefreshToken();
             if ($this->returnExpiration) {
-                $data[$this->tokenExpirationParameterName] = $datetime->getTimestamp();
+                $data[$this->tokenExpirationParameterName] = $refreshTokenEvent->getRefreshToken()->getValid()->getTimestamp();
             }
         }
 

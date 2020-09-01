@@ -11,7 +11,8 @@
 
 namespace Gesdinet\JWTRefreshTokenBundle\Service;
 
-use Gesdinet\JWTRefreshTokenBundle\Event\RefreshEvent;
+use Gesdinet\JWTRefreshTokenBundle\Event\RefreshTokenEvent;
+use Gesdinet\JWTRefreshTokenBundle\Events;
 use Gesdinet\JWTRefreshTokenBundle\Security\Authenticator\RefreshTokenAuthenticator;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 use Symfony\Contracts\EventDispatcher\EventDispatcherInterface as ContractsEventDispatcherInterface;
@@ -76,15 +77,9 @@ class RefreshToken
     /**
      * RefreshToken constructor.
      *
-     * @param RefreshTokenAuthenticator             $authenticator
-     * @param RefreshTokenProvider                  $provider
-     * @param AuthenticationSuccessHandlerInterface $successHandler
-     * @param AuthenticationFailureHandlerInterface $failureHandler
-     * @param RefreshTokenManagerInterface          $refreshTokenManager
-     * @param int                                   $ttl
-     * @param string                                $providerKey
-     * @param bool                                  $ttlUpdate
-     * @param EventDispatcherInterface              $eventDispatcher
+     * @param int    $ttl
+     * @param string $providerKey
+     * @param bool   $ttlUpdate
      */
     public function __construct(
         RefreshTokenAuthenticator $authenticator,
@@ -110,8 +105,6 @@ class RefreshToken
 
     /**
      * Refresh token.
-     *
-     * @param Request $request
      *
      * @return mixed
      *
@@ -151,10 +144,11 @@ class RefreshToken
             $this->refreshTokenManager->save($refreshToken);
         }
 
+        $refreshTokenEvent = new RefreshTokenEvent($refreshToken, $postAuthenticationToken);
         if ($this->eventDispatcher instanceof ContractsEventDispatcherInterface) {
-            $this->eventDispatcher->dispatch(new RefreshEvent($refreshToken, $postAuthenticationToken), 'gesdinet.refresh_token');
+            $this->eventDispatcher->dispatch($refreshTokenEvent, Events::ON_REFRESH_TOKEN);
         } else {
-            $this->eventDispatcher->dispatch('gesdinet.refresh_token', new RefreshEvent($refreshToken, $postAuthenticationToken));
+            $this->eventDispatcher->dispatch(Events::ON_REFRESH_TOKEN, $refreshTokenEvent);
         }
 
         return $this->successHandler->onAuthenticationSuccess($request, $postAuthenticationToken);

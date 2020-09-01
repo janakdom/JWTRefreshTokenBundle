@@ -14,6 +14,7 @@ use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\HeaderBag;
 use Symfony\Component\HttpFoundation\ParameterBag;
+use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 class AttachRefreshTokenOnSuccessListenerSpec extends ObjectBehavior
 {
@@ -21,12 +22,12 @@ class AttachRefreshTokenOnSuccessListenerSpec extends ObjectBehavior
     const TOKEN_EXPIRATION_PARAMETER_NAME = 'refresh_token_expiration';
     const RETURN_EXPORATION = true;
 
-    public function let(RefreshTokenManagerInterface $refreshTokenManager, ValidatorInterface $validator, RequestStack $requestStack)
+    public function let(RefreshTokenManagerInterface $refreshTokenManager, ValidatorInterface $validator, RequestStack $requestStack, EventDispatcherInterface $eventDispatcher)
     {
         $ttl = 2592000;
         $userIdentityField = 'username';
         $singleUse = false;
-        $this->beConstructedWith($refreshTokenManager, $ttl, $validator, $requestStack, $userIdentityField, self::TOKEN_PARAMETER_NAME, self::TOKEN_EXPIRATION_PARAMETER_NAME, self::RETURN_EXPORATION, $singleUse);
+        $this->beConstructedWith($refreshTokenManager, $ttl, $validator, $requestStack, $userIdentityField, self::TOKEN_PARAMETER_NAME, self::TOKEN_EXPIRATION_PARAMETER_NAME, self::RETURN_EXPORATION, $singleUse, $eventDispatcher);
     }
 
     public function it_is_initializable()
@@ -42,7 +43,7 @@ class AttachRefreshTokenOnSuccessListenerSpec extends ObjectBehavior
 
         $tokenString = 'thepreviouslyissuedrefreshtoken';
         $refreshTokenArray = [self::TOKEN_PARAMETER_NAME => $tokenString];
-        $headers = new HeaderBag(array('content_type' => 'not-json'));
+        $headers = new HeaderBag(['content_type' => 'not-json']);
         $request = new Request();
         $request->headers = $headers;
         $request->request = new ParameterBag($refreshTokenArray);
